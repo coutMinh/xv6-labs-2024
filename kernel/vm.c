@@ -488,17 +488,43 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 
 #ifdef LAB_PGTBL
-void
-vmprint(pagetable_t pagetable) {
-  // your code here
-}
-#endif
-
-
-
-#ifdef LAB_PGTBL
 pte_t*
 pgpte(pagetable_t pagetable, uint64 va) {
   return walk(pagetable, va, 0);
+}
+
+// Helper function to recursively print page table
+void
+vmprint_helper(pagetable_t pagetable, int level, uint64 va_base) {
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      // this PTE points to a lower-level page table or a physical page
+      uint64 child = PTE2PA(pte);
+      
+      // Calculate virtual address for this entry
+      uint64 va = va_base + ((uint64)i << (12 + 9 * (2 - level)));
+      
+      // print: " .." repeated (level+1) times, then "0x<va>"
+      printf(" ..");
+      for(int j = 0; j < level; j++){
+        printf(" ..");
+      }
+      printf("0x%lx\n", va);
+      
+      // if this is not the last level and the PTE is valid, recurse
+      if(level < 2){
+        vmprint_helper((pagetable_t)child, level + 1, va);
+      }
+    }
+  }
+}
+
+// Print the page table in a tree structure
+void
+vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  vmprint_helper(pagetable, 0, 0);
 }
 #endif
