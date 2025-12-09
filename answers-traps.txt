@@ -1,0 +1,76 @@
+1. Which registers contain arguments to functions? For example, which register holds 13 in main's call to printf?
+
+RISC-V uses registers a0-a7 for function arguments. In main's call to printf:
+- a0 holds the format string pointer
+- a1 holds 12 (the result of f(8)+1)
+- a2 holds 13
+
+Looking at the assembly (line 24-26):
+  24:	4635                	li	a2,13      # Load 13 into a2
+  26:	45b1                	li	a1,12      # Load 12 into a1
+
+
+2. Where is the call to function f in the assembly code for main? Where is the call to g?
+
+There is NO call to f or g in main's assembly code. The compiler has inlined both functions.
+Looking at line 26 in main: li a1,12 - this directly computes f(8)+1 = 11+1 = 12
+The compiler optimized away the function calls since:
+- f(8) calls g(8) which returns 8+3 = 11
+- Then f returns 11
+- Then main uses 11+1 = 12
+
+The compiler calculated this at compile time (constant folding).
+
+
+3. At what address is the function printf located?
+
+Looking at line 1205 of call.asm:
+00000000000006bc <printf>:
+
+printf is located at address 0x6bc (or 0x00000000000006bc in full form).
+
+
+4. What value is in the register ra just after the jalr to printf in main?
+
+Looking at main's call to printf (line 30):
+  30:	68c000ef          	jal	6bc <printf>
+
+The jal (jump and link) instruction saves the return address in ra.
+The return address is the address of the next instruction after jal.
+Next instruction is at address 0x34 (line 34: exit(0) call).
+
+So ra contains 0x34 (or 0x0000000000000034).
+
+
+5. Run the following code:
+    unsigned int i = 0x00646c72;
+    printf("H%x Wo%s", 57616, (char *) &i);
+What is the output?
+
+The output is: He110 World
+
+Explanation:
+- %x formats 57616 in hexadecimal = 0xe110 → "e110"
+- %s treats &i as a string pointer
+- i = 0x00646c72 in little-endian byte order in memory: 72 6c 64 00
+- These bytes are ASCII: 'r' 'l' 'd' '\0' → "rld"
+- Combined: "H" + "e110" + " Wo" + "rld" = "He110 World"
+
+
+6. If the RISC-V were instead big-endian, what would you set i to in order to yield the same output? Would you need to change 57616 to a different value?
+
+For big-endian, to get the same string "rld" we need bytes: 72 6c 64 00
+But in big-endian, these are stored in the same order they appear in the integer.
+So i = 0x726c6400
+
+We would NOT need to change 57616 because hexadecimal number formatting is independent of endianness - the value 57616 is still 0xe110 in hex regardless of byte order.
+
+
+7. In the following code, what is going to be printed after 'y='? Why does this happen?
+    printf("x=%d y=%d", 3);
+
+The output will be: x=3 y=<garbage_value>
+
+This happens because printf expects two integer arguments for the two %d format specifiers, but only one argument (3) is provided. 
+
+The second %d will read whatever value happens to be in register a2 (the third argument register). This is undefined behavior - it could be any leftover value from previous function calls. The actual value is unpredictable and depends on what was previously stored in a2.
